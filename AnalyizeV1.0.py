@@ -1,10 +1,14 @@
 import os
 import re
+import sys
 import pdfplumber
 import pandas as pd
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox
 from tkinter.scrolledtext import ScrolledText
+from PIL import Image, ImageTk
+import ttkbootstrap as ttk
+from ttkbootstrap.constants import *
 import threading
 from datetime import datetime
 import json
@@ -16,14 +20,28 @@ class AnalisadorParcelamentos:
         self.empresas_codigos = {}  # Dicionário para mapear CNPJ -> Código
         self.dados_filtrados_atual = []  # Para manter os dados atualmente filtrados
         self.colunas_ordem = {}  # Para rastrear direção de ordenação de cada coluna
+        self._assets_dir = self._obter_pasta_assets()
         self.setup_gui()
+
+    def _obter_pasta_assets(self):
+        """Retorna o caminho da pasta assets, compatível com PyInstaller e execução direta"""
+        if getattr(sys, 'frozen', False):
+            base = sys._MEIPASS
+        else:
+            base = os.path.dirname(os.path.abspath(__file__))
+        return os.path.join(base, "assets")
         
     def setup_gui(self):
-        # Criar janela principal
-        self.janela = tk.Tk()
-        self.janela.title("Analisador de Parcelamentos - PDFs da Receita Federal v2.0")
+        # Criar janela principal com ttkbootstrap
+        self.janela = ttk.Window(themename="superhero")
+        self.janela.title("Analyize - Analisador de Parcelamentos v2.0")
         self.janela.geometry("1500x900")
         self.janela.resizable(True, True)
+
+        # Definir ícone da janela (favicon)
+        favicon_path = os.path.join(self._assets_dir, "favicon.ico")
+        if os.path.exists(favicon_path):
+            self.janela.iconbitmap(favicon_path)
 
         # Notebook para abas
         self.notebook = ttk.Notebook(self.janela)
@@ -36,108 +54,117 @@ class AnalisadorParcelamentos:
     def criar_aba_configuracao(self):
         # Aba 1: Configuração
         frame_config = ttk.Frame(self.notebook)
-        self.notebook.add(frame_config, text="⚙️ Configuração")
+        self.notebook.add(frame_config, text="  Configuração")
 
-        # Título
-        title_label = tk.Label(frame_config, text="📊 Analisador de Parcelamentos v2.0", 
-                              font=("Arial", 16, "bold"), fg="#2E7D32")
-        title_label.pack(pady=(10, 20))
+        # Header com logo
+        header_frame = ttk.Frame(frame_config)
+        header_frame.pack(pady=(10, 20))
+
+        logo_path = os.path.join(self._assets_dir, "Analayize_logo.png")
+        if os.path.exists(logo_path):
+            img = Image.open(logo_path).resize((48, 48), Image.LANCZOS)
+            self._logo_img = ImageTk.PhotoImage(img)
+            ttk.Label(header_frame, image=self._logo_img).pack(side="left", padx=(0, 10))
+
+        title_label = ttk.Label(header_frame, text="Analyize - Analisador de Parcelamentos v2.0",
+                               font=("Arial", 16, "bold"), bootstyle="success")
+        title_label.pack(side="left")
 
         # Frame para inputs
-        inputs_frame = tk.Frame(frame_config)
+        inputs_frame = ttk.Frame(frame_config)
         inputs_frame.pack(fill="x", padx=20, pady=10)
 
         # Pasta dos PDFs
-        tk.Label(inputs_frame, text="📁 Pasta com os PDFs:", font=("Arial", 10, "bold")).pack(anchor="w", pady=(5, 2))
-        frame_pdfs = tk.Frame(inputs_frame)
+        ttk.Label(inputs_frame, text="Pasta com os PDFs:", font=("Arial", 10, "bold")).pack(anchor="w", pady=(5, 2))
+        frame_pdfs = ttk.Frame(inputs_frame)
         frame_pdfs.pack(fill="x", pady=(0, 10))
-        self.entrada_pasta_pdfs = tk.Entry(frame_pdfs, font=("Arial", 9))
+        self.entrada_pasta_pdfs = ttk.Entry(frame_pdfs)
         self.entrada_pasta_pdfs.pack(side="left", fill="x", expand=True, padx=(0, 5))
-        tk.Button(frame_pdfs, text="Selecionar", command=self.selecionar_pasta_pdfs, 
-                  bg="#1976D2", fg="white").pack(side="right")
+        ttk.Button(frame_pdfs, text="Selecionar", command=self.selecionar_pasta_pdfs,
+                   bootstyle="info-outline").pack(side="right")
 
         # Excel de empresas (opcional)
-        tk.Label(inputs_frame, text="📊 Excel com empresas filtradas (opcional):", font=("Arial", 10, "bold")).pack(anchor="w", pady=(5, 2))
-        frame_excel = tk.Frame(inputs_frame)
+        ttk.Label(inputs_frame, text="Excel com empresas filtradas (opcional):", font=("Arial", 10, "bold")).pack(anchor="w", pady=(5, 2))
+        frame_excel = ttk.Frame(inputs_frame)
         frame_excel.pack(fill="x", pady=(0, 10))
-        self.entrada_excel = tk.Entry(frame_excel, font=("Arial", 9))
+        self.entrada_excel = ttk.Entry(frame_excel)
         self.entrada_excel.pack(side="left", fill="x", expand=True, padx=(0, 5))
-        tk.Button(frame_excel, text="Selecionar", command=self.selecionar_excel_empresas, 
-                  bg="#1976D2", fg="white").pack(side="right")
+        ttk.Button(frame_excel, text="Selecionar", command=self.selecionar_excel_empresas,
+                   bootstyle="info-outline").pack(side="right")
 
         # Pasta de saída
-        tk.Label(inputs_frame, text="💾 Pasta para salvar resultado:", font=("Arial", 10, "bold")).pack(anchor="w", pady=(5, 2))
-        frame_saida = tk.Frame(inputs_frame)
+        ttk.Label(inputs_frame, text="Pasta para salvar resultado:", font=("Arial", 10, "bold")).pack(anchor="w", pady=(5, 2))
+        frame_saida = ttk.Frame(inputs_frame)
         frame_saida.pack(fill="x", pady=(0, 10))
-        self.entrada_pasta_saida = tk.Entry(frame_saida, font=("Arial", 9))
+        self.entrada_pasta_saida = ttk.Entry(frame_saida)
         self.entrada_pasta_saida.pack(side="left", fill="x", expand=True, padx=(0, 5))
-        tk.Button(frame_saida, text="Selecionar", command=self.selecionar_pasta_saida, 
-                  bg="#1976D2", fg="white").pack(side="right")
+        ttk.Button(frame_saida, text="Selecionar", command=self.selecionar_pasta_saida,
+                   bootstyle="info-outline").pack(side="right")
 
         # Opções avançadas
-        options_frame = tk.LabelFrame(inputs_frame, text="Opções Avançadas", font=("Arial", 9, "bold"))
+        options_frame = ttk.LabelFrame(inputs_frame, text="Opções Avançadas", bootstyle="secondary")
         options_frame.pack(fill="x", pady=10)
 
         self.incluir_detalhes_debitos = tk.BooleanVar(value=True)
-        tk.Checkbutton(options_frame, text="Incluir detalhes de débitos pendentes", 
-                      variable=self.incluir_detalhes_debitos).pack(anchor="w", padx=10, pady=2)
+        ttk.Checkbutton(options_frame, text="Incluir detalhes de débitos pendentes",
+                        variable=self.incluir_detalhes_debitos, bootstyle="round-toggle").pack(anchor="w", padx=10, pady=2)
 
         self.agrupar_por_empresa = tk.BooleanVar(value=False)
-        tk.Checkbutton(options_frame, text="Agrupar resultados por empresa", 
-                      variable=self.agrupar_por_empresa).pack(anchor="w", padx=10, pady=2)
+        ttk.Checkbutton(options_frame, text="Agrupar resultados por empresa",
+                        variable=self.agrupar_por_empresa, bootstyle="round-toggle").pack(anchor="w", padx=10, pady=2)
 
         self.salvar_backup_json = tk.BooleanVar(value=True)
-        tk.Checkbutton(options_frame, text="Salvar backup em JSON", 
-                      variable=self.salvar_backup_json).pack(anchor="w", padx=10, pady=2)
+        ttk.Checkbutton(options_frame, text="Salvar backup em JSON",
+                        variable=self.salvar_backup_json, bootstyle="round-toggle").pack(anchor="w", padx=10, pady=2)
 
         # Botões de ação
-        buttons_frame = tk.Frame(inputs_frame)
+        buttons_frame = ttk.Frame(inputs_frame)
         buttons_frame.pack(pady=20)
 
-        self.btn_processar = tk.Button(buttons_frame, text="🔄 Processar PDFs", command=self.processar_pdfs, 
-                                      bg="#4CAF50", fg="white", font=("Arial", 12, "bold"), 
-                                      padx=30, pady=10)
+        self.btn_processar = ttk.Button(buttons_frame, text="Processar PDFs", command=self.processar_pdfs,
+                                        bootstyle="success", padding=(30, 10))
         self.btn_processar.pack(side="left", padx=10)
 
-        tk.Button(buttons_frame, text="🧹 Limpar Resultados", command=self.limpar_resultados, 
-                  bg="#FF5722", fg="white", font=("Arial", 10), padx=20, pady=10).pack(side="left", padx=10)
+        ttk.Button(buttons_frame, text="Limpar Resultados", command=self.limpar_resultados,
+                   bootstyle="danger-outline", padding=(20, 10)).pack(side="left", padx=10)
 
-        tk.Button(buttons_frame, text="💾 Salvar Configuração", command=self.salvar_config, 
-                  bg="#2196F3", fg="white", font=("Arial", 10), padx=20, pady=10).pack(side="left", padx=10)
+        ttk.Button(buttons_frame, text="Salvar Configuração", command=self.salvar_config,
+                   bootstyle="info", padding=(20, 10)).pack(side="left", padx=10)
 
         # Progress bar
         self.progress_var = tk.DoubleVar()
-        self.progress_bar = ttk.Progressbar(inputs_frame, variable=self.progress_var, maximum=100)
+        self.progress_bar = ttk.Progressbar(inputs_frame, variable=self.progress_var,
+                                            maximum=100, bootstyle="success-striped")
         self.progress_bar.pack(fill="x", pady=10)
 
         # Status atual
-        self.status_label = tk.Label(inputs_frame, text="Aguardando configuração...", 
-                                    font=("Arial", 9), fg="#666666")
+        self.status_label = ttk.Label(inputs_frame, text="Aguardando configuração...",
+                                      font=("Arial", 9), bootstyle="secondary")
         self.status_label.pack(pady=5)
 
         # Área de resultados do processamento
-        tk.Label(inputs_frame, text="📋 Log do Processamento:", font=("Arial", 10, "bold")).pack(anchor="w", pady=(20, 5))
+        ttk.Label(inputs_frame, text="Log do Processamento:", font=("Arial", 10, "bold")).pack(anchor="w", pady=(20, 5))
         self.text_resultados = ScrolledText(inputs_frame, height=12, font=("Courier", 9))
         self.text_resultados.pack(fill="both", expand=True, pady=(0, 20))
 
     def criar_aba_resultados(self):
         # Aba 2: Resultados
         frame_resultados = ttk.Frame(self.notebook)
-        self.notebook.add(frame_resultados, text="📊 Parcelamentos")
+        self.notebook.add(frame_resultados, text="  Parcelamentos")
 
         # Toolbar - Linha 1
-        toolbar = tk.Frame(frame_resultados)
+        toolbar = ttk.Frame(frame_resultados)
         toolbar.pack(fill="x", padx=10, pady=5)
 
         # Filtros - Linha 1
-        tk.Label(toolbar, text="🔍 Filtros:", font=("Arial", 10, "bold")).grid(row=0, column=0, padx=5, sticky="w")
+        ttk.Label(toolbar, text="Filtros:", font=("Arial", 10, "bold"), bootstyle="info").grid(row=0, column=0, padx=5, sticky="w")
 
-        tk.Label(toolbar, text="Empresa/CNPJ:").grid(row=0, column=1, padx=5)
-        self.filtro_empresa = tk.Entry(toolbar, width=25)
+        ttk.Label(toolbar, text="Empresa/CNPJ:").grid(row=0, column=1, padx=5)
+        self.filtro_empresa = ttk.Entry(toolbar, width=25)
         self.filtro_empresa.grid(row=0, column=2, padx=5)
-        self.filtro_empresa.bind("<KeyRelease>", lambda e: self.aplicar_filtros())  # Busca em tempo real
+        self.filtro_empresa.bind("<KeyRelease>", lambda e: self.aplicar_filtros())
 
-        tk.Label(toolbar, text="Tipo:").grid(row=0, column=3, padx=5)
+        ttk.Label(toolbar, text="Tipo:").grid(row=0, column=3, padx=5)
         self.filtro_tipo = ttk.Combobox(
             toolbar,
             width=15,
@@ -147,7 +174,7 @@ class AnalisadorParcelamentos:
         self.filtro_tipo.grid(row=0, column=4, padx=5)
         self.filtro_tipo.bind("<<ComboboxSelected>>", lambda e: self.aplicar_filtros())
 
-        tk.Label(toolbar, text="Status:").grid(row=0, column=5, padx=5)
+        ttk.Label(toolbar, text="Status:").grid(row=0, column=5, padx=5)
         self.filtro_status = ttk.Combobox(
             toolbar,
             width=20,
@@ -158,10 +185,10 @@ class AnalisadorParcelamentos:
         self.filtro_status.bind("<<ComboboxSelected>>", lambda e: self.aplicar_filtros())
 
         # Filtros - Linha 2
-        toolbar2 = tk.Frame(frame_resultados)
+        toolbar2 = ttk.Frame(frame_resultados)
         toolbar2.pack(fill="x", padx=10, pady=(0, 5))
 
-        tk.Label(toolbar2, text="Com Parcelas em Atraso:").grid(row=0, column=0, padx=5)
+        ttk.Label(toolbar2, text="Com Parcelas em Atraso:").grid(row=0, column=0, padx=5)
         self.filtro_atraso = ttk.Combobox(
             toolbar2,
             width=10,
@@ -171,34 +198,37 @@ class AnalisadorParcelamentos:
         self.filtro_atraso.grid(row=0, column=1, padx=5)
         self.filtro_atraso.bind("<<ComboboxSelected>>", lambda e: self.aplicar_filtros())
 
-        tk.Label(toolbar2, text="Valor Mínimo (R$):").grid(row=0, column=2, padx=5)
-        self.filtro_valor_min = tk.Entry(toolbar2, width=15)
+        ttk.Label(toolbar2, text="Valor Mínimo (R$):").grid(row=0, column=2, padx=5)
+        self.filtro_valor_min = ttk.Entry(toolbar2, width=15)
         self.filtro_valor_min.insert(0, "0")
         self.filtro_valor_min.grid(row=0, column=3, padx=5)
         self.filtro_valor_min.bind("<KeyRelease>", lambda e: self.aplicar_filtros())
 
-        tk.Button(toolbar2, text="Limpar Filtros", command=self.limpar_filtros, bg="#FF9800", fg="white").grid(row=0, column=4, padx=10)
+        ttk.Button(toolbar2, text="Limpar Filtros", command=self.limpar_filtros,
+                   bootstyle="warning-outline").grid(row=0, column=4, padx=10)
 
         # Ações
-        tk.Button(toolbar2, text="📤 Exportar Filtrados", command=self.exportar_filtrados, bg="#4CAF50", fg="white").grid(row=0, column=5, padx=5)
-        tk.Button(toolbar2, text="📋 Copiar Selecionados", command=self.copiar_selecionados, bg="#9C27B0", fg="white").grid(row=0, column=6, padx=5)
+        ttk.Button(toolbar2, text="Exportar Filtrados", command=self.exportar_filtrados,
+                   bootstyle="success-outline").grid(row=0, column=5, padx=5)
+        ttk.Button(toolbar2, text="Copiar Selecionados", command=self.copiar_selecionados,
+                   bootstyle="secondary").grid(row=0, column=6, padx=5)
 
         # Contador de resultados
-        self.label_contador = tk.Label(toolbar2, text="Nenhum resultado", font=("Arial", 9), fg="#666")
+        self.label_contador = ttk.Label(toolbar2, text="Nenhum resultado", font=("Arial", 9), bootstyle="secondary")
         self.label_contador.grid(row=0, column=7, padx=20)
 
         # Tabela de parcelamentos
-        frame_tabela = tk.Frame(frame_resultados)
+        frame_tabela = ttk.Frame(frame_resultados)
         frame_tabela.pack(fill="both", expand=True, padx=10, pady=10)
 
         # Colunas da tabela
         colunas = ("Código", "Empresa", "CNPJ", "Tipo", "Subtipo", "Conta", "Modalidade", "Status", "Detalhes", "Valor", "Arquivo")
-        self.tree_parcelamentos = ttk.Treeview(frame_tabela, columns=colunas, show="headings", height=20)
+        self.tree_parcelamentos = ttk.Treeview(frame_tabela, columns=colunas, show="headings", height=20, bootstyle="dark")
 
         # Configurar colunas
         larguras = {"Código": 80, "Empresa": 180, "CNPJ": 120, "Tipo": 80, "Subtipo": 100, "Conta": 100,
                    "Modalidade": 180, "Status": 120, "Detalhes": 200, "Valor": 100, "Arquivo": 150}
-        
+
         for col in colunas:
             self.tree_parcelamentos.heading(col, text=col, command=lambda c=col: self.ordenar_coluna(c))
             self.tree_parcelamentos.column(col, width=larguras.get(col, 100))
@@ -223,12 +253,12 @@ class AnalisadorParcelamentos:
     def criar_aba_dashboard(self):
         # Aba 3: Dashboard
         frame_dashboard = ttk.Frame(self.notebook)
-        self.notebook.add(frame_dashboard, text="📈 Dashboard")
+        self.notebook.add(frame_dashboard, text="  Dashboard")
 
         # Container principal com scroll
-        canvas_dash = tk.Canvas(frame_dashboard)
+        canvas_dash = tk.Canvas(frame_dashboard, highlightthickness=0)
         scrollbar_dash = ttk.Scrollbar(frame_dashboard, orient="vertical", command=canvas_dash.yview)
-        scroll_frame = tk.Frame(canvas_dash)
+        scroll_frame = ttk.Frame(canvas_dash)
 
         scroll_frame.bind(
             "<Configure>",
@@ -241,17 +271,17 @@ class AnalisadorParcelamentos:
         canvas_dash.pack(side="left", fill="both", expand=True)
         scrollbar_dash.pack(side="right", fill="y")
 
-        # Estatísticas gerais com cards visuais
-        stats_frame = tk.LabelFrame(scroll_frame, text="📊 Visão Geral", font=("Arial", 11, "bold"))
+        # Estatísticas gerais com cards visuais (mantém tk.Frame/tk.Label para cores customizadas)
+        stats_frame = ttk.LabelFrame(scroll_frame, text="Visão Geral", bootstyle="info")
         stats_frame.pack(fill="x", padx=20, pady=10)
 
         # Grid para estatísticas
         self.stats_labels = {}
         stats_info = [
-            ("total_empresas", "🏢 Total de Empresas", "#1976D2"),
-            ("total_parcelamentos", "📋 Total de Parcelamentos", "#388E3C"),
-            ("empresas_com_parcelas_atraso", "⚠️ Com Parcelas em Atraso", "#D32F2F"),
-            ("valor_total_suspenso", "💰 Valor Total", "#F57C00")
+            ("total_empresas", "Total de Empresas", "#1976D2"),
+            ("total_parcelamentos", "Total de Parcelamentos", "#388E3C"),
+            ("empresas_com_parcelas_atraso", "Com Parcelas em Atraso", "#D32F2F"),
+            ("valor_total_suspenso", "Valor Total", "#F57C00")
         ]
 
         for i, (key, label, cor) in enumerate(stats_info):
@@ -266,12 +296,12 @@ class AnalisadorParcelamentos:
         for i in range(4):
             stats_frame.grid_columnconfigure(i, weight=1)
 
-        # NOVO: Empresas Críticas (Top 10 com mais parcelas em atraso)
-        criticas_frame = tk.LabelFrame(scroll_frame, text="🚨 Empresas Críticas (Mais Parcelas em Atraso)", font=("Arial", 10, "bold"))
+        # Empresas Críticas (Top 10 com mais parcelas em atraso)
+        criticas_frame = ttk.LabelFrame(scroll_frame, text="Empresas Críticas (Mais Parcelas em Atraso)", bootstyle="danger")
         criticas_frame.pack(fill="x", padx=20, pady=10)
 
         colunas_criticas = ("Empresa", "CNPJ", "Parcelas em Atraso", "Tipo")
-        self.tree_criticas = ttk.Treeview(criticas_frame, columns=colunas_criticas, show="headings", height=10)
+        self.tree_criticas = ttk.Treeview(criticas_frame, columns=colunas_criticas, show="headings", height=10, bootstyle="dark")
 
         for col in colunas_criticas:
             self.tree_criticas.heading(col, text=col)
@@ -283,12 +313,12 @@ class AnalisadorParcelamentos:
 
         self.tree_criticas.pack(fill="x", padx=10, pady=10)
 
-        # NOVO: Ranking por Valor
-        ranking_frame = tk.LabelFrame(scroll_frame, text="💎 Top 10 Maiores Valores", font=("Arial", 10, "bold"))
+        # Ranking por Valor
+        ranking_frame = ttk.LabelFrame(scroll_frame, text="Top 10 Maiores Valores", bootstyle="warning")
         ranking_frame.pack(fill="x", padx=20, pady=10)
 
         colunas_ranking = ("Empresa", "CNPJ", "Valor Total", "Qtd. Parcelamentos")
-        self.tree_ranking = ttk.Treeview(ranking_frame, columns=colunas_ranking, show="headings", height=10)
+        self.tree_ranking = ttk.Treeview(ranking_frame, columns=colunas_ranking, show="headings", height=10, bootstyle="dark")
 
         for col in colunas_ranking:
             self.tree_ranking.heading(col, text=col)
@@ -301,12 +331,12 @@ class AnalisadorParcelamentos:
         self.tree_ranking.pack(fill="x", padx=10, pady=10)
 
         # Resumo por tipo com gráfico visual
-        resumo_frame = tk.LabelFrame(scroll_frame, text="📈 Distribuição por Tipo", font=("Arial", 10, "bold"))
+        resumo_frame = ttk.LabelFrame(scroll_frame, text="Distribuição por Tipo", bootstyle="success")
         resumo_frame.pack(fill="both", expand=True, padx=20, pady=10)
 
         # Tabela resumo
         colunas_resumo = ("Tipo", "Quantidade", "Empresas", "Percentual", "Gráfico")
-        self.tree_resumo = ttk.Treeview(resumo_frame, columns=colunas_resumo, show="headings", height=8)
+        self.tree_resumo = ttk.Treeview(resumo_frame, columns=colunas_resumo, show="headings", height=8, bootstyle="dark")
 
         for col in colunas_resumo:
             self.tree_resumo.heading(col, text=col)
@@ -710,7 +740,7 @@ class AnalisadorParcelamentos:
                 self.log(f"\n❌ ERRO: {str(e)}")
             
             finally:
-                self.btn_processar.config(state="normal", text="🔄 Processar PDFs")
+                self.btn_processar.config(state="normal", text="Processar PDFs")
                 self.status_label.config(text="Processamento concluído")
                 self.progress_var.set(100)
 
