@@ -102,7 +102,7 @@ class AnalisadorParcelamentos:
                    bootstyle="info-outline").pack(side="right")
 
         # Opções avançadas
-        options_frame = ttk.LabelFrame(inputs_frame, text="Opções Avançadas", bootstyle="secondary")
+        options_frame = ttk.LabelFrame(inputs_frame, text="Opções Avançadas")
         options_frame.pack(fill="x", pady=10)
 
         self.incluir_detalhes_debitos = tk.BooleanVar(value=True)
@@ -272,7 +272,7 @@ class AnalisadorParcelamentos:
         scrollbar_dash.pack(side="right", fill="y")
 
         # Estatísticas gerais com cards visuais (mantém tk.Frame/tk.Label para cores customizadas)
-        stats_frame = ttk.LabelFrame(scroll_frame, text="Visão Geral", bootstyle="info")
+        stats_frame = ttk.LabelFrame(scroll_frame, text="Visão Geral")
         stats_frame.pack(fill="x", padx=20, pady=10)
 
         # Grid para estatísticas
@@ -297,7 +297,7 @@ class AnalisadorParcelamentos:
             stats_frame.grid_columnconfigure(i, weight=1)
 
         # Empresas Críticas (Top 10 com mais parcelas em atraso)
-        criticas_frame = ttk.LabelFrame(scroll_frame, text="Empresas Críticas (Mais Parcelas em Atraso)", bootstyle="danger")
+        criticas_frame = ttk.LabelFrame(scroll_frame, text="Empresas Críticas (Mais Parcelas em Atraso)")
         criticas_frame.pack(fill="x", padx=20, pady=10)
 
         colunas_criticas = ("Empresa", "CNPJ", "Parcelas em Atraso", "Tipo")
@@ -314,7 +314,7 @@ class AnalisadorParcelamentos:
         self.tree_criticas.pack(fill="x", padx=10, pady=10)
 
         # Ranking por Valor
-        ranking_frame = ttk.LabelFrame(scroll_frame, text="Top 10 Maiores Valores", bootstyle="warning")
+        ranking_frame = ttk.LabelFrame(scroll_frame, text="Top 10 Maiores Valores")
         ranking_frame.pack(fill="x", padx=20, pady=10)
 
         colunas_ranking = ("Empresa", "CNPJ", "Valor Total", "Qtd. Parcelamentos")
@@ -331,7 +331,7 @@ class AnalisadorParcelamentos:
         self.tree_ranking.pack(fill="x", padx=10, pady=10)
 
         # Resumo por tipo com gráfico visual
-        resumo_frame = ttk.LabelFrame(scroll_frame, text="Distribuição por Tipo", bootstyle="success")
+        resumo_frame = ttk.LabelFrame(scroll_frame, text="Distribuição por Tipo")
         resumo_frame.pack(fill="both", expand=True, padx=20, pady=10)
 
         # Tabela resumo
